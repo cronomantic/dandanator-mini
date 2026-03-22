@@ -8,7 +8,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write   # write access is needed to attach the fat JAR to the GitHub Release
       packages: write
     steps:
       - uses: actions/checkout@v4
@@ -23,6 +23,14 @@ jobs:
         run: mvn --batch-mode deploy -Dsurefire.excludes="**/fft/SoundTests.java"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Attach fat JAR to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          # The fat JAR (dandanator-mini-<version>.jar) is built by the deploy step above.
+          # It bundles all runtime dependencies and can be run directly with:
+          #   java -jar dandanator-mini-<version>.jar          (graphical mode)
+          #   java -jar dandanator-mini-<version>.jar --cli …  (command-line mode)
+          files: target/dandanator-mini-*.jar
 
   native-packages:
     strategy:

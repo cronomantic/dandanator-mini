@@ -100,7 +100,6 @@ public class DandanatorMiniV9RomSetHandler extends DandanatorMiniRomSetHandlerSu
 
     public DandanatorMiniV9RomSetHandler() throws IOException {
         menuImages = new ZxScreen[MAX_MENU_PAGES];
-        initializeMenuImages(menuImages);
         currentRomUsage = new SimpleDoubleProperty();
         previewUpdateTimer = new AnimationTimer() {
             int currentFrame = 0;
@@ -1264,6 +1263,11 @@ public class DandanatorMiniV9RomSetHandler extends DandanatorMiniRomSetHandlerSu
         this.applicationContext = applicationContext;
         generationAllowedProperty.bind(getGenerationAllowedBinding(applicationContext));
 
+        try {
+            initializeMenuImages(menuImages);
+        } catch (IOException e) {
+            LOGGER.error("Initializing menu images", e);
+        }
         applicationContext.getRomSetHandlerInfoPane().getChildren()
                 .add(getDandanatorMiniFrame(applicationContext));
         updateMenuPreview();
