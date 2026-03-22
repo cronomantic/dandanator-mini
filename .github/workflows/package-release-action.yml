@@ -21,6 +21,9 @@ jobs:
       - name: Deploy to GitHub Packages
         # SoundTests require real audio hardware; all other tests run normally.
         # CI (ci.yml) already validated this commit before the tag was created.
+        # continue-on-error: deploy failures (e.g. permissions) must not prevent
+        # the fat JAR from being attached to the GitHub Release below.
+        continue-on-error: true
         run: mvn --batch-mode deploy -Dsurefire.excludes="**/fft/SoundTests.java"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
