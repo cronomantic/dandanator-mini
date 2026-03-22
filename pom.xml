@@ -63,6 +63,13 @@
 						</goals>
 						<configuration>
 							<createDependencyReducedPom>false</createDependencyReducedPom>
+							<!--
+							  Produce dandanator-mini-<version>.jar (no "-jar-with-dependencies" suffix).
+							  This overrides Maven's default finalName behaviour and ensures a clean,
+							  predictable artifact name that can be used directly and attached to
+							  GitHub Releases.
+							-->
+							<finalName>${project.artifactId}-${project.version}</finalName>
 							<filters>
 								<filter>
 									<artifact>*:*</artifact>
