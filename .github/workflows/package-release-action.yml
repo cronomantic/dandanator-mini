@@ -3,6 +3,7 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -23,7 +24,13 @@ jobs:
         run: mvn --batch-mode deploy -Dsurefire.excludes="**/fft/SoundTests.java"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload fat JAR artifact for inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: dandanator-mini-jar
+          path: target/dandanator-mini-*.jar
       - name: Attach fat JAR to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           # The fat JAR (dandanator-mini-<version>.jar) is built by the deploy step above.
@@ -74,6 +81,7 @@ jobs:
         if: matrix.install-deps != ''
         run: ${{ matrix.install-deps }}
       - name: Build native package
+        shell: bash
         run: mvn --batch-mode verify -DskipTests -Pjpackage -Djpackage.type=${{ matrix.package-type }}
       - name: Create tarball for app-image
         if: matrix.package-type == 'app-image'
@@ -88,6 +96,7 @@ jobs:
           name: ${{ matrix.artifact-name }}
           path: target/dist/
       - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           # target/dist/ contains exactly one installer file per matrix entry:
