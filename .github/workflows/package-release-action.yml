@@ -74,6 +74,7 @@ jobs:
         if: matrix.install-deps != ''
         run: ${{ matrix.install-deps }}
       - name: Build native package
+        shell: bash
         run: mvn --batch-mode verify -DskipTests -Pjpackage -Djpackage.type=${{ matrix.package-type }}
       - name: Create tarball for app-image
         if: matrix.package-type == 'app-image'

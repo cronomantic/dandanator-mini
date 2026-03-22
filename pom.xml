@@ -23,7 +23,7 @@
 		<repository>
 			<id>github</id>
 			<name>GitHub Packages</name>
-			<url>https://maven.pkg.github.com/teiram/dandanator-mini</url>
+			<url>https://maven.pkg.github.com/cronomantic/dandanator-mini</url>
 		</repository>
 	</distributionManagement>
 
