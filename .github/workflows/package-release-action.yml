@@ -23,8 +23,32 @@ jobs:
 
   native-packages:
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          # Debian/Ubuntu: .deb installer (Debian, Ubuntu, Mint, Pop!_OS, ...)
+          - os: ubuntu-latest
+            package-type: deb
+            artifact-name: dandanator-mini-linux-deb
+            install-deps: sudo apt-get update && sudo apt-get install -y fakeroot binutils
+          # Fedora/RHEL/openSUSE: .rpm installer
+          - os: ubuntu-latest
+            package-type: rpm
+            artifact-name: dandanator-mini-linux-rpm
+            install-deps: sudo apt-get update && sudo apt-get install -y rpm binutils
+          # Arch Linux and other distros: app-image packaged as .tar.gz
+          - os: ubuntu-latest
+            package-type: app-image
+            artifact-name: dandanator-mini-linux-app-image
+            install-deps: sudo apt-get update && sudo apt-get install -y binutils
+          # Windows: .exe installer
+          - os: windows-latest
+            package-type: exe
+            artifact-name: dandanator-mini-windows-exe
+          # macOS: .dmg installer
+          - os: macos-latest
+            package-type: dmg
+            artifact-name: dandanator-mini-macos-dmg
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
@@ -34,10 +58,20 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
+      - name: Install native packaging dependencies
+        if: matrix.install-deps != ''
+        run: ${{ matrix.install-deps }}
       - name: Build native package
-        run: mvn --batch-mode verify -DskipTests -Pjpackage
+        run: mvn --batch-mode verify -DskipTests -Pjpackage -Djpackage.type=${{ matrix.package-type }}
+      - name: Create tarball for app-image
+        if: matrix.package-type == 'app-image'
+        shell: bash
+        run: |
+          cd target/dist
+          tar -czf dandanator-mini-linux-app-image.tar.gz "Dandanator Mini"
+          rm -rf "Dandanator Mini"
       - name: Upload native package
         uses: actions/upload-artifact@v4
         with:
-          name: dandanator-mini-${{ matrix.os }}
+          name: ${{ matrix.artifact-name }}
           path: target/dist/

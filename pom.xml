@@ -245,10 +245,20 @@
 	<profiles>
 		<!--
 		  Build native installers for the current platform using jpackage (JDK 14+).
+		  Required build tools are installed automatically by detecting the available
+		  package manager (pacman, dnf, zypper, apt-get).
 		  The resulting installer is placed in target/dist/.
 
-		  Usage:
+		  Usage (platform default type):
 		    mvn verify -Pjpackage -DskipTests
+
+		  Supported types per platform:
+		    Linux   : deb (Debian/Ubuntu), rpm (Fedora/RHEL/openSUSE),
+		              app-image tarball (Arch Linux and any distro)
+		    macOS   : dmg, pkg
+		    Windows : exe, msi
+		  Example:
+		    mvn verify -Pjpackage -DskipTests -Djpackage.type=rpm
 		-->
 		<profile>
 			<id>jpackage</id>
@@ -266,7 +276,61 @@
 									<goal>run</goal>
 								</goals>
 								<configuration>
-									<target>
+									<target xmlns:if="ant:if" xmlns:unless="ant:unless">
+										<!--
+										  Macro: install packages via the first detected package
+										  manager. Detection order: pacman → dnf → zypper → apt-get.
+										  failonerror="false" lets the build continue even when sudo
+										  is unavailable; jpackage will then report a clear error if
+										  a required tool is still missing.
+										-->
+										<macrodef name="install-deps">
+											<attribute name="pacman-pkgs"/>
+											<attribute name="dnf-pkgs"/>
+											<attribute name="zypper-pkgs"/>
+											<attribute name="apt-pkgs"/>
+											<sequential>
+												<exec executable="/bin/sh" failonerror="false" osfamily="unix">
+													<arg value="-c"/>
+													<arg value="if command -v pacman &gt;/dev/null 2&gt;&amp;1; then sudo pacman -S --noconfirm @{pacman-pkgs}; elif command -v dnf &gt;/dev/null 2&gt;&amp;1; then sudo dnf install -y @{dnf-pkgs}; elif command -v zypper &gt;/dev/null 2&gt;&amp;1; then sudo zypper install -y @{zypper-pkgs}; elif command -v apt-get &gt;/dev/null 2&gt;&amp;1; then sudo apt-get install -y @{apt-pkgs}; fi"/>
+												</exec>
+											</sequential>
+										</macrodef>
+
+										<!-- Derive per-type condition flags -->
+										<condition property="jpackage.type.is.deb">
+											<equals arg1="${jpackage.type}" arg2="deb"/>
+										</condition>
+										<condition property="jpackage.type.is.rpm">
+											<equals arg1="${jpackage.type}" arg2="rpm"/>
+										</condition>
+										<condition property="jpackage.type.is.appimage">
+											<equals arg1="${jpackage.type}" arg2="app-image"/>
+										</condition>
+
+										<!-- deb: fakeroot + binutils on all distros -->
+										<install-deps if:set="jpackage.type.is.deb"
+											pacman-pkgs="fakeroot binutils"
+											dnf-pkgs="fakeroot binutils"
+											zypper-pkgs="fakeroot binutils"
+											apt-pkgs="fakeroot binutils"/>
+
+										<!-- rpm: rpm-build + binutils
+										     (pacman/Arch: binutils only; rpmbuild is in AUR) -->
+										<install-deps if:set="jpackage.type.is.rpm"
+											pacman-pkgs="binutils"
+											dnf-pkgs="rpm-build binutils"
+											zypper-pkgs="rpm-build binutils"
+											apt-pkgs="rpm binutils"/>
+
+										<!-- app-image: binutils only
+										     (preferred type for Arch Linux and other distros) -->
+										<install-deps if:set="jpackage.type.is.appimage"
+											pacman-pkgs="binutils"
+											dnf-pkgs="binutils"
+											zypper-pkgs="binutils"
+											apt-pkgs="binutils"/>
+
 										<mkdir dir="${project.build.directory}/jpackage-input"/>
 										<copy file="${project.build.directory}/${project.artifactId}-${project.version}.jar"
 											  todir="${project.build.directory}/jpackage-input"/>
@@ -284,6 +348,8 @@
 											<arg value="${project.version}"/>
 											<arg value="--vendor"/>
 											<arg value="Grelobites"/>
+											<arg value="--type" if:set="jpackage.type"/>
+											<arg value="${jpackage.type}" if:set="jpackage.type"/>
 											<arg value="--dest"/>
 											<arg value="${project.build.directory}/dist"/>
 										</exec>
