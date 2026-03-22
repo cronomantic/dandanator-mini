@@ -12,8 +12,8 @@ jobs:
       contents: write   # write access is needed to attach the fat JAR to the GitHub Release
       packages: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
         with:
           java-version: '21'
           distribution: 'temurin'
@@ -21,14 +21,24 @@ jobs:
       - name: Deploy to GitHub Packages
         # SoundTests require real audio hardware; all other tests run normally.
         # CI (ci.yml) already validated this commit before the tag was created.
-        # continue-on-error: deploy failures (e.g. permissions) must not prevent
-        # the fat JAR from being attached to the GitHub Release below.
-        continue-on-error: true
-        run: mvn --batch-mode deploy -Dsurefire.excludes="**/fft/SoundTests.java"
+        # Skip deploy if this version already exists in GitHub Packages to avoid
+        # a 409 Conflict on workflow re-runs (GitHub Packages is immutable).
+        run: |
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          GROUP_PATH=$(mvn help:evaluate -Dexpression=project.groupId -q -DforceStdout | tr '.' '/')
+          ARTIFACT=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            "https://maven.pkg.github.com/${{ github.repository }}/${GROUP_PATH}/${ARTIFACT}/${VERSION}/${ARTIFACT}-${VERSION}.pom")
+          if [ "$STATUS" = "200" ]; then
+            echo "::notice::Version ${VERSION} already published to GitHub Packages — skipping deploy."
+          else
+            mvn --batch-mode deploy -Dsurefire.excludes="**/fft/SoundTests.java"
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload fat JAR artifact for inspection
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: dandanator-mini-jar
           path: target/dandanator-mini-*.jar
@@ -74,8 +84,8 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
         with:
           java-version: '21'
           distribution: 'temurin'
@@ -94,7 +104,7 @@ jobs:
           tar -czf dandanator-mini-linux-app-image.tar.gz "Dandanator Mini"
           rm -rf "Dandanator Mini"
       - name: Upload artifact for inspection
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.artifact-name }}
           path: target/dist/
