@@ -1,22 +1,88 @@
-name: Publish package to GitHub Packages
+name: Release
 on:
   push:
-    branches: [master]
     tags:
       - 'v*'
+
 jobs:
-  publish:
-    runs-on: ubuntu-latest 
-    permissions: 
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
       contents: read
-      packages: write 
+      packages: write
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-java@v2
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
-          java-version: '17'
-          distribution: 'adopt'
-      - name: Publish package
-        run: mvn --batch-mode deploy
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+      - name: Deploy to GitHub Packages
+        # SoundTests require real audio hardware; all other tests run normally.
+        # CI (ci.yml) already validated this commit before the tag was created.
+        run: mvn --batch-mode deploy -Dsurefire.excludes="**/fft/SoundTests.java"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  native-packages:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Debian/Ubuntu: .deb installer (Debian, Ubuntu, Mint, Pop!_OS, ...)
+          - os: ubuntu-latest
+            package-type: deb
+            artifact-name: dandanator-mini-linux-deb
+            install-deps: sudo apt-get update && sudo apt-get install -y fakeroot binutils
+          # Fedora/RHEL/openSUSE: .rpm installer
+          - os: ubuntu-latest
+            package-type: rpm
+            artifact-name: dandanator-mini-linux-rpm
+            install-deps: sudo apt-get update && sudo apt-get install -y rpm binutils
+          # Arch Linux and other distros: app-image packaged as .tar.gz
+          - os: ubuntu-latest
+            package-type: app-image
+            artifact-name: dandanator-mini-linux-app-image
+            install-deps: sudo apt-get update && sudo apt-get install -y binutils
+          # Windows: .exe installer
+          - os: windows-latest
+            package-type: exe
+            artifact-name: dandanator-mini-windows-exe
+          # macOS: .dmg installer
+          - os: macos-latest
+            package-type: dmg
+            artifact-name: dandanator-mini-macos-dmg
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+      - name: Install native packaging dependencies
+        if: matrix.install-deps != ''
+        run: ${{ matrix.install-deps }}
+      - name: Build native package
+        run: mvn --batch-mode verify -DskipTests -Pjpackage -Djpackage.type=${{ matrix.package-type }}
+      - name: Create tarball for app-image
+        if: matrix.package-type == 'app-image'
+        shell: bash
+        run: |
+          cd target/dist
+          tar -czf dandanator-mini-linux-app-image.tar.gz "Dandanator Mini"
+          rm -rf "Dandanator Mini"
+      - name: Upload artifact for inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: target/dist/
+      - name: Attach to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          # target/dist/ contains exactly one installer file per matrix entry:
+          # .deb, .rpm, .tar.gz (app-image), .exe, or .dmg
+          files: target/dist/*
+

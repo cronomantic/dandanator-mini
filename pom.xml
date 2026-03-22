@@ -8,8 +8,8 @@
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<mainClass>com.grelobites.romgenerator.MainShade</mainClass>
-		<javafx.version>17.0.0.1</javafx.version>
-		<maven.compiler.release>8</maven.compiler.release>
+		<javafx.version>21.0.3</javafx.version>
+		<maven.compiler.release>11</maven.compiler.release>
 	</properties>
 
     <scm>
@@ -46,16 +46,15 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
-				<version>3.5.1</version>
+				<version>3.13.0</version>
 				<configuration>
-					<source>8</source>
-					<target>8</target>
+					<release>11</release>
 				</configuration>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-shade-plugin</artifactId>
-				<version>3.2.1</version>
+				<version>3.6.0</version>
 				<executions>
 					<execution>
 						<phase>package</phase>
@@ -64,6 +63,15 @@
 						</goals>
 						<configuration>
 							<createDependencyReducedPom>false</createDependencyReducedPom>
+							<filters>
+								<filter>
+									<artifact>*:*</artifact>
+									<excludes>
+										<exclude>module-info.class</exclude>
+										<exclude>META-INF/versions/*/module-info.class</exclude>
+									</excludes>
+								</filter>
+							</filters>
 							<transformers>
 								<transformer
 										implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
@@ -131,6 +139,8 @@
 			<artifactId>javafx-media</artifactId>
 			<version>${javafx.version}</version>
 		</dependency>
+		<!-- Platform-specific JavaFX JARs (native libraries) bundled for all platforms -->
+		<!-- Windows x86_64 -->
 		<dependency>
 			<groupId>org.openjfx</groupId>
 			<artifactId>javafx-controls</artifactId>
@@ -145,6 +155,19 @@
 		</dependency>
 		<dependency>
 			<groupId>org.openjfx</groupId>
+			<artifactId>javafx-graphics</artifactId>
+			<version>${javafx.version}</version>
+			<classifier>win</classifier>
+		</dependency>
+		<dependency>
+			<groupId>org.openjfx</groupId>
+			<artifactId>javafx-media</artifactId>
+			<version>${javafx.version}</version>
+			<classifier>win</classifier>
+		</dependency>
+		<!-- macOS x86_64 -->
+		<dependency>
+			<groupId>org.openjfx</groupId>
 			<artifactId>javafx-controls</artifactId>
 			<version>${javafx.version}</version>
 			<classifier>mac</classifier>
@@ -155,6 +178,44 @@
 			<version>${javafx.version}</version>
 			<classifier>mac</classifier>
 		</dependency>
+		<dependency>
+			<groupId>org.openjfx</groupId>
+			<artifactId>javafx-graphics</artifactId>
+			<version>${javafx.version}</version>
+			<classifier>mac</classifier>
+		</dependency>
+		<dependency>
+			<groupId>org.openjfx</groupId>
+			<artifactId>javafx-media</artifactId>
+			<version>${javafx.version}</version>
+			<classifier>mac</classifier>
+		</dependency>
+		<!-- macOS ARM64 (Apple Silicon) -->
+		<dependency>
+			<groupId>org.openjfx</groupId>
+			<artifactId>javafx-controls</artifactId>
+			<version>${javafx.version}</version>
+			<classifier>mac-aarch64</classifier>
+		</dependency>
+		<dependency>
+			<groupId>org.openjfx</groupId>
+			<artifactId>javafx-fxml</artifactId>
+			<version>${javafx.version}</version>
+			<classifier>mac-aarch64</classifier>
+		</dependency>
+		<dependency>
+			<groupId>org.openjfx</groupId>
+			<artifactId>javafx-graphics</artifactId>
+			<version>${javafx.version}</version>
+			<classifier>mac-aarch64</classifier>
+		</dependency>
+		<dependency>
+			<groupId>org.openjfx</groupId>
+			<artifactId>javafx-media</artifactId>
+			<version>${javafx.version}</version>
+			<classifier>mac-aarch64</classifier>
+		</dependency>
+		<!-- Linux x86_64 -->
 		<dependency>
 			<groupId>org.openjfx</groupId>
 			<artifactId>javafx-controls</artifactId>
@@ -171,19 +232,158 @@
 			<groupId>org.openjfx</groupId>
 			<artifactId>javafx-graphics</artifactId>
 			<version>${javafx.version}</version>
-			<classifier>win</classifier>
+			<classifier>linux</classifier>
 		</dependency>
 		<dependency>
 			<groupId>org.openjfx</groupId>
-			<artifactId>javafx-graphics</artifactId>
-			<version>${javafx.version}</version>
-			<classifier>mac</classifier>
-		</dependency>
-		<dependency>
-			<groupId>org.openjfx</groupId>
-			<artifactId>javafx-graphics</artifactId>
+			<artifactId>javafx-media</artifactId>
 			<version>${javafx.version}</version>
 			<classifier>linux</classifier>
 		</dependency>
 	</dependencies>
+
+	<profiles>
+		<!--
+		  Build native installers for the current platform using jpackage (JDK 14+).
+		  Required build tools are installed automatically before invoking jpackage:
+		    Linux  : detects pacman / dnf / zypper / apt-get and installs the needed
+		             package manager tools (fakeroot, binutils, rpm-build, …).
+		    Windows: detects winget or choco and installs WiX Toolset 3.x (required
+		             by jpackage for exe/msi types). GitHub Actions windows-latest
+		             already ships WiX pre-installed.
+		  All install steps use failonerror="false" so the build continues even when
+		  sudo/elevation is unavailable; jpackage itself will then report a clear
+		  error if a tool is still missing.
+		  The resulting installer is placed in target/dist/.
+
+		  Usage (platform default type):
+		    mvn verify -Pjpackage -DskipTests
+
+		  Supported types per platform:
+		    Linux   : deb (Debian/Ubuntu), rpm (Fedora/RHEL/openSUSE),
+		              app-image tarball (Arch Linux and any distro)
+		    macOS   : dmg, pkg
+		    Windows : exe, msi
+		  Example:
+		    mvn verify -Pjpackage -DskipTests -Djpackage.type=rpm
+		-->
+		<profile>
+			<id>jpackage</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-antrun-plugin</artifactId>
+						<version>3.1.0</version>
+						<executions>
+							<execution>
+								<id>jpackage</id>
+								<phase>verify</phase>
+								<goals>
+									<goal>run</goal>
+								</goals>
+								<configuration>
+									<target xmlns:if="ant:if" xmlns:unless="ant:unless">
+										<!--
+										  Linux/macOS: install packages via the first detected package
+										  manager. Detection order: pacman → dnf → zypper → apt-get.
+										  failonerror="false" lets the build continue even when sudo
+										  is unavailable; jpackage will then report a clear error if
+										  a required tool is still missing.
+										-->
+										<macrodef name="install-deps">
+											<attribute name="pacman-pkgs"/>
+											<attribute name="dnf-pkgs"/>
+											<attribute name="zypper-pkgs"/>
+											<attribute name="apt-pkgs"/>
+											<sequential>
+												<exec executable="/bin/sh" failonerror="false" osfamily="unix">
+													<arg value="-c"/>
+													<arg value="if command -v pacman &gt;/dev/null 2&gt;&amp;1; then sudo pacman -S --noconfirm @{pacman-pkgs}; elif command -v dnf &gt;/dev/null 2&gt;&amp;1; then sudo dnf install -y @{dnf-pkgs}; elif command -v zypper &gt;/dev/null 2&gt;&amp;1; then sudo zypper install -y @{zypper-pkgs}; elif command -v apt-get &gt;/dev/null 2&gt;&amp;1; then sudo apt-get install -y @{apt-pkgs}; fi"/>
+												</exec>
+											</sequential>
+										</macrodef>
+
+										<!-- Derive per-type condition flags -->
+										<condition property="jpackage.type.is.deb">
+											<equals arg1="${jpackage.type}" arg2="deb"/>
+										</condition>
+										<condition property="jpackage.type.is.rpm">
+											<equals arg1="${jpackage.type}" arg2="rpm"/>
+										</condition>
+										<condition property="jpackage.type.is.appimage">
+											<equals arg1="${jpackage.type}" arg2="app-image"/>
+										</condition>
+										<!--
+										  exe and msi both require WiX Toolset 3.x on Windows.
+										  GitHub Actions windows-latest has it pre-installed.
+										-->
+										<condition property="jpackage.type.needs.wix">
+											<or>
+												<equals arg1="${jpackage.type}" arg2="exe"/>
+												<equals arg1="${jpackage.type}" arg2="msi"/>
+											</or>
+										</condition>
+
+										<!-- deb: fakeroot + binutils on all distros -->
+										<install-deps if:set="jpackage.type.is.deb"
+											pacman-pkgs="fakeroot binutils"
+											dnf-pkgs="fakeroot binutils"
+											zypper-pkgs="fakeroot binutils"
+											apt-pkgs="fakeroot binutils"/>
+
+										<!-- rpm: rpm-build + binutils
+										     (pacman/Arch: binutils only; rpmbuild is in AUR) -->
+										<install-deps if:set="jpackage.type.is.rpm"
+											pacman-pkgs="binutils"
+											dnf-pkgs="rpm-build binutils"
+											zypper-pkgs="rpm-build binutils"
+											apt-pkgs="rpm binutils"/>
+
+										<!-- app-image: binutils only
+										     (preferred type for Arch Linux and other distros) -->
+										<install-deps if:set="jpackage.type.is.appimage"
+											pacman-pkgs="binutils"
+											dnf-pkgs="binutils"
+											zypper-pkgs="binutils"
+											apt-pkgs="binutils"/>
+
+										<!-- exe/msi: WiX Toolset 3.x — tries winget, then choco -->
+										<exec executable="powershell" failonerror="false" osfamily="windows" if:set="jpackage.type.needs.wix">
+											<arg value="-NoProfile"/>
+											<arg value="-Command"/>
+											<arg value="if (Get-Command winget -ErrorAction SilentlyContinue) { winget install --id WixToolset.WiX -e --accept-source-agreements --accept-package-agreements } elseif (Get-Command choco -ErrorAction SilentlyContinue) { choco install wixtoolset -y }"/>
+										</exec>
+
+										<mkdir dir="${project.build.directory}/jpackage-input"/>
+										<copy file="${project.build.directory}/${project.artifactId}-${project.version}.jar"
+											  todir="${project.build.directory}/jpackage-input"/>
+										<mkdir dir="${project.build.directory}/dist"/>
+										<exec executable="${java.home}/bin/jpackage" failonerror="true">
+											<arg value="--input"/>
+											<arg value="${project.build.directory}/jpackage-input"/>
+											<arg value="--name"/>
+											<arg value="Dandanator Mini"/>
+											<arg value="--main-jar"/>
+											<arg value="${project.artifactId}-${project.version}.jar"/>
+											<arg value="--main-class"/>
+											<arg value="${mainClass}"/>
+											<arg value="--app-version"/>
+											<arg value="${project.version}"/>
+											<arg value="--vendor"/>
+											<arg value="Grelobites"/>
+											<arg value="--type" if:set="jpackage.type"/>
+											<arg value="${jpackage.type}" if:set="jpackage.type"/>
+											<arg value="--dest"/>
+											<arg value="${project.build.directory}/dist"/>
+										</exec>
+									</target>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
 </project>
