@@ -30,6 +30,7 @@ jobs:
           name: dandanator-mini-jar
           path: target/dandanator-mini-*.jar
       - name: Attach fat JAR to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           # The fat JAR (dandanator-mini-<version>.jar) is built by the deploy step above.
@@ -95,6 +96,7 @@ jobs:
           name: ${{ matrix.artifact-name }}
           path: target/dist/
       - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           # target/dist/ contains exactly one installer file per matrix entry:
