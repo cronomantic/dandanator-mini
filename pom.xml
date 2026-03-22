@@ -245,8 +245,15 @@
 	<profiles>
 		<!--
 		  Build native installers for the current platform using jpackage (JDK 14+).
-		  Required build tools are installed automatically by detecting the available
-		  package manager (pacman, dnf, zypper, apt-get).
+		  Required build tools are installed automatically before invoking jpackage:
+		    Linux  : detects pacman / dnf / zypper / apt-get and installs the needed
+		             package manager tools (fakeroot, binutils, rpm-build, …).
+		    Windows: detects winget or choco and installs WiX Toolset 3.x (required
+		             by jpackage for exe/msi types). GitHub Actions windows-latest
+		             already ships WiX pre-installed.
+		  All install steps use failonerror="false" so the build continues even when
+		  sudo/elevation is unavailable; jpackage itself will then report a clear
+		  error if a tool is still missing.
 		  The resulting installer is placed in target/dist/.
 
 		  Usage (platform default type):
@@ -278,7 +285,7 @@
 								<configuration>
 									<target xmlns:if="ant:if" xmlns:unless="ant:unless">
 										<!--
-										  Macro: install packages via the first detected package
+										  Linux/macOS: install packages via the first detected package
 										  manager. Detection order: pacman → dnf → zypper → apt-get.
 										  failonerror="false" lets the build continue even when sudo
 										  is unavailable; jpackage will then report a clear error if
@@ -307,6 +314,16 @@
 										<condition property="jpackage.type.is.appimage">
 											<equals arg1="${jpackage.type}" arg2="app-image"/>
 										</condition>
+										<!--
+										  exe and msi both require WiX Toolset 3.x on Windows.
+										  GitHub Actions windows-latest has it pre-installed.
+										-->
+										<condition property="jpackage.type.needs.wix">
+											<or>
+												<equals arg1="${jpackage.type}" arg2="exe"/>
+												<equals arg1="${jpackage.type}" arg2="msi"/>
+											</or>
+										</condition>
 
 										<!-- deb: fakeroot + binutils on all distros -->
 										<install-deps if:set="jpackage.type.is.deb"
@@ -330,6 +347,13 @@
 											dnf-pkgs="binutils"
 											zypper-pkgs="binutils"
 											apt-pkgs="binutils"/>
+
+										<!-- exe/msi: WiX Toolset 3.x — tries winget, then choco -->
+										<exec executable="powershell" failonerror="false" osfamily="windows" if:set="jpackage.type.needs.wix">
+											<arg value="-NoProfile"/>
+											<arg value="-Command"/>
+											<arg value="if (Get-Command winget -ErrorAction SilentlyContinue) { winget install --id WixToolset.WiX -e --accept-source-agreements --accept-package-agreements } elseif (Get-Command choco -ErrorAction SilentlyContinue) { choco install wixtoolset -y }"/>
+										</exec>
 
 										<mkdir dir="${project.build.directory}/jpackage-input"/>
 										<copy file="${project.build.directory}/${project.artifactId}-${project.version}.jar"
