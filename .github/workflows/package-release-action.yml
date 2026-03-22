@@ -23,6 +23,11 @@ jobs:
         run: mvn --batch-mode deploy -Dsurefire.excludes="**/fft/SoundTests.java"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload fat JAR artifact for inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: dandanator-mini-jar
+          path: target/dandanator-mini-*.jar
       - name: Attach fat JAR to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
