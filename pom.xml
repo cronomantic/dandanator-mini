@@ -78,6 +78,41 @@
 										<exclude>META-INF/versions/*/module-info.class</exclude>
 									</excludes>
 								</filter>
+								<!--
+								  Platform-specific JavaFX classifier JARs (e.g. javafx-controls-21-win.jar)
+								  contain the same Java classes and resources as the base JARs, plus
+								  platform-native libraries (.dll/.so/.dylib). Restrict what is taken
+								  from each classifier JAR to only the native libraries so that
+								  maven-shade-plugin does not warn about overlapping classes/resources.
+								  The base (no-classifier) JARs already provide all required classes
+								  and non-native resources.
+								-->
+								<filter>
+									<artifact>org.openjfx:*:jar:win</artifact>
+									<includes>
+										<include>**/*.dll</include>
+									</includes>
+								</filter>
+								<filter>
+									<artifact>org.openjfx:*:jar:mac</artifact>
+									<includes>
+										<include>**/*.dylib</include>
+										<include>**/*.jnilib</include>
+									</includes>
+								</filter>
+								<filter>
+									<artifact>org.openjfx:*:jar:mac-aarch64</artifact>
+									<includes>
+										<include>**/*.dylib</include>
+										<include>**/*.jnilib</include>
+									</includes>
+								</filter>
+								<filter>
+									<artifact>org.openjfx:*:jar:linux</artifact>
+									<includes>
+										<include>**/*.so</include>
+									</includes>
+								</filter>
 							</filters>
 							<transformers>
 								<transformer

@@ -12,8 +12,8 @@ jobs:
       contents: write   # write access is needed to attach the fat JAR to the GitHub Release
       packages: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
         with:
           java-version: '21'
           distribution: 'temurin'
@@ -28,7 +28,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload fat JAR artifact for inspection
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: dandanator-mini-jar
           path: target/dandanator-mini-*.jar
@@ -74,8 +74,8 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
         with:
           java-version: '21'
           distribution: 'temurin'
@@ -94,7 +94,7 @@ jobs:
           tar -czf dandanator-mini-linux-app-image.tar.gz "Dandanator Mini"
           rm -rf "Dandanator Mini"
       - name: Upload artifact for inspection
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.artifact-name }}
           path: target/dist/
